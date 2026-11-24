@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio libre – Pygame Zero</title>
+<style>
+  :root{
+    --bg:#1B6FA8; --dark:#14598A; --deep:#0F4A75; --light:#2E87C6;
+    --y:#F7CF46; --y2:#E0B52C; --w:#fff; --code:#0E2A44; --code2:#163C5E;
+    --ok:#5BD68A; --err:#FF6B6B;
+    --mono: Consolas, "Cascadia Code", "Fira Code", Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--deep);overflow:hidden;font-family:var(--sans)}
+  #stage{position:fixed;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center;background:var(--bg);overflow:hidden;border-radius:6px}
+  .wave{position:absolute;pointer-events:none;left:0;top:0}
+  header{position:absolute;left:30px;top:20px;width:1220px;height:76px;background:var(--y);border-radius:38px;display:flex;align-items:center;
+    padding:0 14px;gap:16px;box-shadow:0 6px 0 var(--y2)}
+  .badge{background:var(--bg);color:var(--y);font-weight:800;border-radius:30px;height:52px;padding:0 20px;display:flex;align-items:center;font-size:20px;white-space:nowrap}
+  header h1{margin:0;font-size:26px;color:var(--deep);font-weight:800;flex:1}
+  header .hint{font-size:15px;color:var(--deep);font-weight:600;opacity:.85;padding-right:10px}
+
+  /* editor */
+  #editor{position:absolute;left:40px;top:116px;width:700px;height:440px;background:var(--code);border:3px solid var(--y);border-radius:18px;
+    overflow:hidden;box-shadow:10px 10px 0 rgba(10,34,56,.55);display:flex;flex-direction:column}
+  .chrome{height:44px;background:var(--code2);display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;flex:none}
+  .chrome i{width:13px;height:13px;border-radius:50%;display:block}
+  .chrome .fname{margin-left:8px;font:14px var(--mono);background:var(--bg);padding:3px 14px;border-radius:12px;color:#fff}
+  .chrome .sp{flex:1}
+  button{font-family:var(--sans);cursor:pointer;border:0;border-radius:22px;font-weight:800;font-size:14px;padding:6px 14px;transition:transform .1s}
+  button:active{transform:scale(.96)}
+  button:disabled{opacity:.45;cursor:default}
+  #run{background:var(--y);color:var(--deep);box-shadow:0 3px 0 var(--y2)}
+  #stop{background:#FF8A8A;color:#5a1010}
+  #restore{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.45);padding:4px 12px}
+  .codewrap{position:relative;flex:1;display:flex;overflow:auto}
+  #gutter{width:46px;flex:none;text-align:right;padding:10px 12px 10px 0;color:#4E7394;font:17px/25px var(--mono);user-select:none;white-space:pre}
+  .area{position:relative;flex:1;min-width:0}
+  #hl,#src{margin:0;padding:10px 14px 30px 4px;font:17px/25px var(--mono);white-space:pre;tab-size:4;border:0;min-height:100%}
+  #hl{position:absolute;inset:0;color:#E6EEF6;pointer-events:none}
+  #src{position:relative;display:block;width:100%;height:100%;background:transparent;color:transparent;caret-color:var(--y);resize:none;outline:none;overflow:hidden}
+  #src::selection{background:rgba(247,207,70,.3);color:transparent}
+  .k{color:#FF9DD2}.s{color:#9BE58B}.n{color:#FFB86B}.f{color:#7FD3FF}.b{color:#F7CF46}.c{color:#6C8BA8;font-style:italic}
+  .errline{position:absolute;left:0;right:0;height:25px;background:rgba(255,107,107,.18);border-left:4px solid var(--err);pointer-events:none;display:none}
+
+  /* consola */
+  #console{position:absolute;left:40px;top:572px;width:700px;height:130px;background:rgba(9,30,50,.85);border-radius:14px;
+    color:#CFE3F5;font:14px/19px var(--mono);padding:10px 14px;overflow:auto;white-space:pre-wrap}
+  #console .t{color:var(--y);font-weight:700}
+  #console .e{color:var(--err)}
+  #console .o{color:var(--ok)}
+  #console .h{color:var(--y);font-family:var(--sans)}
+
+  /* juego */
+  #win{position:absolute;left:770px;top:116px;width:470px;border-radius:14px;overflow:hidden;background:#000;border:3px solid var(--deep);
+    box-shadow:10px 10px 0 rgba(10,34,56,.55)}
+  #win .bar{height:32px;background:#E9EEF3;display:flex;align-items:center;padding:0 12px;gap:8px;font:600 13px var(--sans);color:#33475B}
+  #win .bar i{width:11px;height:11px;border-radius:50%;display:block}
+  #win .bar .sz{margin-left:auto;font:12px var(--mono);color:#6A7F93}
+  #cv{display:block;width:100%;outline:none;image-rendering:pixelated;background:#000}
+  #status{position:absolute;inset:32px 0 0 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;text-align:center;padding:20px;
+    background:rgba(15,74,117,.92);line-height:1.5}
+  #tips{position:absolute;left:770px;top:500px;width:470px;height:202px;background:var(--deep);border:3px solid var(--y);border-radius:18px;
+    padding:12px 18px;color:#fff;font-size:14.5px;line-height:1.5;overflow:auto}
+  #tips b{color:var(--y)}
+  #tips code{font-family:var(--mono);background:var(--code);color:var(--y);padding:0 6px;border-radius:5px;font-size:13.5px}
+  #tips ul{margin:4px 0 0;padding-left:18px}
+
+  /* entrada */
+  #splash{position:absolute;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none;opacity:0}
+  #splash .ring{position:absolute;width:520px;height:520px;border-radius:50%;border:14px solid var(--y);opacity:.25}
+  #splash .pill{background:var(--y);color:var(--deep);font-weight:900;font-size:24px;letter-spacing:2px;padding:10px 28px;border-radius:30px;box-shadow:0 5px 0 var(--y2)}
+  #splash .big{color:#fff;font-weight:900;font-size:86px;letter-spacing:3px;line-height:1}
+  #splash .sub{color:#cfe6f7;font-weight:600;font-size:24px}
+  .pre #splash,.intro #splash{opacity:1}
+  .pre #splash>*{opacity:0}
+  .intro #splash{animation:splashOut .5s cubic-bezier(.6,0,.8,.4) 1.35s forwards}
+  .intro #splash .ring{animation:ringIn .9s cubic-bezier(.2,1.2,.4,1) .05s backwards}
+  .intro #splash .pill{animation:popIn .5s cubic-bezier(.2,1.6,.4,1) .15s backwards}
+  .intro #splash .big{animation:popIn .55s cubic-bezier(.2,1.5,.4,1) .3s backwards}
+  .intro #splash .sub{animation:fadeUp .45s ease-out .5s backwards}
+  @keyframes splashOut{to{opacity:0;transform:translateY(-40px) scale(1.04)}}
+  @keyframes ringIn{from{transform:scale(.2);opacity:0}}
+  @keyframes popIn{from{transform:scale(.3);opacity:0}}
+  @keyframes fadeUp{from{transform:translateY(24px);opacity:0}}
+  @keyframes dropIn{from{transform:translateY(-120px);opacity:0}}
+  @keyframes fromLeft{from{transform:translateX(-140px) rotate(-2deg);opacity:0}}
+  @keyframes fromRight{from{transform:translateX(160px) rotate(2deg);opacity:0}}
+  .pre header,.pre #editor,.pre #console,.pre #win,.pre #tips{visibility:hidden}
+  .intro header{animation:dropIn .6s cubic-bezier(.2,1.4,.4,1) 1.55s backwards}
+  .intro #editor{animation:fromLeft .65s cubic-bezier(.2,1.2,.4,1) 1.75s backwards}
+  .intro #win{animation:fromRight .65s cubic-bezier(.2,1.2,.4,1) 1.9s backwards}
+  .intro #console,.intro #tips{animation:fadeUp .45s ease-out 2.2s backwards}
+</style>
+</head>
+<body>
+<div id="stage" class="pre">
+  <div id="splash"><div class="ring"></div><div class="pill">🧪 ZONA EXTRA</div><div class="big">LABORATORIO LIBRE</div><div class="sub">Experimenta sin miedo: aquí no se rompe nada</div></div>
+  <svg class="wave" width="1280" height="720" viewBox="0 0 1280 720">
+    <path d="M0,720 C340,690 600,560 860,260 L1280,260 L1280,720 Z" fill="#14598A" opacity=".35"/>
+  </svg>
+
+  <header>
+    <div class="badge">🧪 Laboratorio</div>
+    <h1>¡Experimenta con tu juego!</h1>
+    <div class="hint">Ctrl + Enter para ejecutar</div>
+  </header>
+
+  <div id="editor">
+    <div class="chrome">
+      <i style="background:#FF6B6B"></i><i style="background:#F7CF46"></i><i style="background:#5BD68A"></i>
+      <span class="fname">juego.py</span><span class="sp"></span>
+      <button id="restore" title="Volver al código de la clase">↺ Código de la clase</button>
+      <button id="stop" disabled>■ Detener</button>
+      <button id="run" disabled>▶ Ejecutar</button>
+    </div>
+    <div class="codewrap" id="codewrap">
+      <div id="gutter">1</div>
+      <div class="area">
+        <div class="errline" id="errline"></div>
+        <pre id="hl" aria-hidden="true"></pre>
+        <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="console"></div>
+
+  <div id="win">
+    <div class="bar"><i style="background:#FF6B6B"></i><i style="background:#F7CF46"></i><i style="background:#5BD68A"></i>&nbsp;Pygame Zero Game<span class="sz" id="sz"></span></div>
+    <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
+    <div id="status">⏳ Preparando Python…<br><small>La primera vez puede tardar unos segundos</small></div>
+  </div>
+
+  <div id="tips">
+    <b>💡 Ideas para probar</b>
+    <ul>
+      <li>Mueve la nave <b>arriba y abajo</b>: <code>keyboard.up</code>, <code>nave.y -= 5</code></li>
+      <li>Que <b>no se salga</b>: <code>if nave.left &lt; 0:</code> <code>nave.left = 0</code></li>
+      <li>Agrega otro actor: <code>alien = Actor("alien")</code> o <code>"estrella"</code></li>
+      <li>Escribe en pantalla: <code>screen.draw.text("Hola", (20, 20))</code></li>
+      <li>¿Chocaron? <code>if nave.colliderect(alien):</code></li>
+    </ul>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- código de la clase (lo que escribió el alumno o la solución) ---------- */
+const DEFAULTS = [
+  'WIDTH = 800\nHEIGHT = 600',
+  'def draw():\n    screen.fill("skyblue")',
+  'nave = Actor("nave")',
+  '    nave.draw()',
+  'def update():\n    if keyboard.left:\n        nave.x -= 5',
+  '    if keyboard.right:\n        nave.x += 5',
+];
+function classCode(){
+  let saved={}; try{ saved=JSON.parse(localStorage.getItem('pgz_clase1_codigo')||'{}'); }catch(e){}
+  const part = i => (saved[i]!=null ? saved[i] : DEFAULTS[i]).replace(/\s+$/,'');
+  const wm = part(0).match(/WIDTH\s*=\s*(\d+)/), hm = part(0).match(/HEIGHT\s*=\s*(\d+)/);
+  const W = wm? +wm[1] : 800, H = hm? +hm[1] : 600;
+  const name = (part(2).match(/^\s*([a-zA-Z_]\w*)\s*=/)||[,'nave'])[1];
+  return ['import pgzrun','',part(0),'',part(2),`${name}.pos = ${Math.round(W/2)}, ${Math.round(H*0.75)}`,'',
+    part(1),part(3),'',part(4),part(5),'','# 🚀 ¡Aquí puedes probar el desafío y tus propias ideas!','','pgzrun.go()',''].join('\n');
+}
+
+/* ---------- editor ---------- */
+const src=$('#src'), hlEl=$('#hl'), gut=$('#gutter');
+function hl(text){
+  const re = /(#.*$)|("[^"\n]*"?|'[^'\n]*'?)|\b(def|if|elif|else|import|from|return|for|in|while|and|or|not|True|False|None|global|pass|break|continue|class|lambda)\b|\b(\d+\.?\d*)\b|\b(Actor|screen|keyboard|pgzrun|Rect|print|range|random)\b|\b([a-zA-Z_]\w*)(?=\s*\()/gm;
+  let out='', last=0, m;
+  while((m=re.exec(text))){
+    out+=esc(text.slice(last,m.index)); const t=esc(m[0]);
+    out+= m[1]?`<span class="c">${t}</span>`:m[2]?`<span class="s">${t}</span>`:m[3]?`<span class="k">${t}</span>`:m[4]?`<span class="n">${t}</span>`:m[5]?`<span class="b">${t}</span>`:`<span class="f">${t}</span>`;
+    last=m.index+m[0].length;
+  }
+  return out+esc(text.slice(last))+'\n';
+}
+function sync(){
+  hlEl.innerHTML = hl(src.value);
+  const n = src.value.split('\n').length;
+  gut.textContent = Array.from({length:n},(_,i)=>i+1).join('\n');
+  src.style.height='0'; src.style.height = Math.max(src.scrollHeight, $('#codewrap').clientHeight)+'px';
+  src.style.width='0'; src.style.width = Math.max(src.scrollWidth, $('.area').clientWidth)+'px';
+  clearTimeout(sync._t); sync._t=setTimeout(()=>{ try{ localStorage.setItem('pgz_clase1_lab', src.value); }catch(e){} }, 400);
+  $('#errline').style.display='none';
+}
+const indentOf = l => { let n=0; for(const ch of l){ if(ch===' ') n++; else if(ch==='\t') n+=4; else break; } return n; };
+function insert(s){ src.setRangeText(s, src.selectionStart, src.selectionEnd, 'end'); sync(); }
+src.addEventListener('input', sync);
+src.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); return; }
+  if(e.key==='Tab'){ e.preventDefault(); insert('    '); return; }
+  if(e.key==='Enter'){ e.preventDefault(); const line=src.value.slice(0,src.selectionStart).split('\n').pop();
+    let ind=indentOf(line); if(/:\s*(#.*)?$/.test(line)) ind+=4; insert('\n'+' '.repeat(ind)); return; }
+  if(e.key==='Backspace' && src.selectionStart===src.selectionEnd){ const p=src.selectionStart; const line=src.value.slice(0,p).split('\n').pop();
+    if(line.length && /^ +$/.test(line)){ e.preventDefault(); const k=(line.length%4)||4; src.setRangeText('',p-k,p,'end'); sync(); } }
+});
+let initial=null; try{ initial=localStorage.getItem('pgz_clase1_lab'); }catch(e){}
+src.value = initial || classCode(); sync();
+
+let confirmRestore=false;
+$('#restore').onclick=()=>{
+  if(!confirmRestore){ confirmRestore=true; log('h','¿Volver al código de la clase? Perderás los cambios de esta página. Pulsa <b>↺ Código de la clase</b> otra vez para confirmar.',true); setTimeout(()=>confirmRestore=false,5000); return; }
+  confirmRestore=false; src.value=classCode(); sync(); log('o','✔ Se restauró el código de la clase.'); run();
+};
+
+/* ---------- consola ---------- */
+const con=$('#console');
+function log(kind, text, html){ const d=document.createElement('div'); d.className=kind; if(html) d.innerHTML=text; else d.textContent=text; con.appendChild(d); con.scrollTop=con.scrollHeight; }
+function clearLog(){ con.innerHTML=''; }
+
+/* ---------- imágenes disponibles (pixel art) ---------- */
+const SPRITES = {
+  nave:{cell:10, px:["....YY....","...YWWY...","...WBBW...","..WWBBWW..","..WWWWWW..",".DWWWWWWD.","DDWWWWWWDD","DD.WWWW.DD","...YOOY...","....OO....",".....Y...."]},
+  alien:{cell:9, px:["..G.....G..","...G...G...","..GGGGGGG..",".GG.GGG.GG.","GGGGGGGGGGG","G.GGGGGGG.G","G.G.....G.G","...GG.GG..."]},
+  estrella:{cell:9, px:["...Y...","...Y...","YYYYYYY",".YYYYY.","..YYY..",".YY.YY.","Y.....Y"]},
+};
+const COL={Y:'#F7CF46',W:'#F4F7FA',B:'#5EC4F5',D:'#0F4A75',O:'#FF8A3D',G:'#6BE36B'};
+const IMG={};
+for(const [k,s] of Object.entries(SPRITES)){
+  const c=document.createElement('canvas'); c.width=s.px[0].length*s.cell; c.height=s.px.length*s.cell;
+  const g=c.getContext('2d'); s.px.forEach((r,j)=>[...r].forEach((ch,i)=>{ if(COL[ch]){ g.fillStyle=COL[ch]; g.fillRect(i*s.cell,j*s.cell,s.cell,s.cell); } }));
+  IMG[k]=c;
+}
+
+/* ---------- puente JS <-> Python ---------- */
+const cv=$('#cv'), g=cv.getContext('2d');
+const keys={};
+const KEYMAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',' ':'space',Enter:'return',Escape:'escape',Shift:'lshift'};
+function keyName(e){ return KEYMAP[e.key] || (e.key.length===1 ? e.key.toLowerCase() : e.key.toLowerCase()); }
+addEventListener('keydown',e=>{ if(document.activeElement===src) return; keys[keyName(e)]=true; if(e.key.startsWith('Arrow')||e.key===' ') e.preventDefault(); });
+addEventListener('keyup',e=>{ keys[keyName(e)]=false; });
+cv.addEventListener('pointerdown',()=>cv.focus());
+const bridge = {
+  key: n => !!keys[n],
+  size: n => IMG[n] ? [IMG[n].width, IMG[n].height] : null,
+  fill: c => { g.save(); g.setTransform(1,0,0,1,0,0); g.fillStyle=c; g.fillRect(0,0,cv.width,cv.height); g.restore(); },
+  actor: (n,x,y,angle) => { const im=IMG[n]; if(!im) return; g.save(); g.translate(x,y); if(angle) g.rotate(-angle*Math.PI/180); g.drawImage(im,-im.width/2,-im.height/2); g.restore(); },
+  text: (s,x,y,center,color,size) => { g.save(); g.font=`bold ${size}px "Segoe UI", sans-serif`; g.fillStyle=color; g.textBaseline=center?'middle':'top'; g.textAlign=center?'center':'left'; g.fillText(s,x,y); g.restore(); },
+  rect: (x,y,w,h,color,filled) => { g.save(); if(filled){ g.fillStyle=color; g.fillRect(x,y,w,h);} else { g.strokeStyle=color; g.lineWidth=1; g.strokeRect(x+.5,y+.5,w-1,h-1);} g.restore(); },
+  circle: (x,y,r,color,filled) => { g.save(); g.beginPath(); g.arc(x,y,r,0,Math.PI*2); if(filled){ g.fillStyle=color; g.fill(); } else { g.strokeStyle=color; g.stroke(); } g.restore(); },
+  line: (x1,y1,x2,y2,color) => { g.save(); g.strokeStyle=color; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); g.restore(); },
+};
+
+// Versión simplificada de Pygame Zero escrita en Python
+const PGZ_STUB = `
+import sys, types, pgzjs
+
+def _col(c):
+    if isinstance(c, str):
+        return c
+    if isinstance(c, (tuple, list)) and len(c) >= 3:
+        return "rgb(%d,%d,%d)" % (c[0], c[1], c[2])
+    raise TypeError("El color debe ser un nombre como \\"red\\" o una tupla (r, g, b)")
+
+class _Keyboard:
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return bool(pgzjs.key(name.lower()))
+keyboard = _Keyboard()
+
+class Rect:
+    def __init__(self, *a):
+        if len(a) == 2:
+            (x, y), (w, h) = a
+        elif len(a) == 4:
+            x, y, w, h = a
+        else:
+            raise TypeError("Rect necesita (x, y, ancho, alto) o ((x, y), (ancho, alto))")
+        self.x, self.y, self.width, self.height = x, y, w, h
+    left = property(lambda s: s.x, lambda s, v: setattr(s, "x", v))
+    top = property(lambda s: s.y, lambda s, v: setattr(s, "y", v))
+    right = property(lambda s: s.x + s.width, lambda s, v: setattr(s, "x", v - s.width))
+    bottom = property(lambda s: s.y + s.height, lambda s, v: setattr(s, "y", v - s.height))
+    center = property(lambda s: (s.x + s.width / 2, s.y + s.height / 2))
+    def colliderect(self, o):
+        return self.x < o.right and self.right > o.left and self.y < o.bottom and self.bottom > o.top
+    def collidepoint(self, *p):
+        px, py = p[0] if len(p) == 1 else p
+        return self.x <= px < self.right and self.y <= py < self.bottom
+
+def _xy(p):
+    return (p[0], p[1]) if p is not None else None
+
+class _Draw:
+    def text(self, text, pos=None, center=None, color="white", fontsize=24, **kw):
+        c = kw.get("colour", color)
+        if center is not None:
+            pgzjs.text(str(text), center[0], center[1], True, _col(c), fontsize)
+        else:
+            p = pos if pos is not None else (0, 0)
+            pgzjs.text(str(text), p[0], p[1], False, _col(c), fontsize)
+    def filled_rect(self, rect, color):
+        pgzjs.rect(rect.x, rect.y, rect.width, rect.height, _col(color), True)
+    def rect(self, rect, color):
+        pgzjs.rect(rect.x, rect.y, rect.width, rect.height, _col(color), False)
+    def filled_circle(self, pos, radius, color):
+        pgzjs.circle(pos[0], pos[1], radius, _col(color), True)
+    def circle(self, pos, radius, color):
+        pgzjs.circle(pos[0], pos[1], radius, _col(color), False)
+    def line(self, start, end, color):
+        pgzjs.line(start[0], start[1], end[0], end[1], _col(color))
+
+class _Screen:
+    draw = _Draw()
+    def fill(self, color):
+        pgzjs.fill(_col(color))
+    def clear(self):
+        pgzjs.fill("black")
+    def blit(self, image, pos):
+        size = pgzjs.size(image)
+        if size is not None:
+            pgzjs.actor(image, pos[0] + size[0] / 2, pos[1] + size[1] / 2, 0)
+screen = _Screen()
+
+class Actor:
+    def __init__(self, image, pos=None, **kw):
+        size = pgzjs.size(image)
+        if size is None:
+            raise FileNotFoundError("No encuentro la imagen '%s'. Imágenes disponibles: nave, alien, estrella" % image)
+        object.__setattr__(self, "_image", image)
+        self.width, self.height = size[0], size[1]
+        self.angle = 0
+        self.x, self.y = (pos if pos is not None else (self.width / 2, self.height / 2))
+        for k, v in kw.items():
+            setattr(self, k, v)
+    image = property(lambda s: s._image, lambda s, v: s._set_image(v))
+    def _set_image(self, v):
+        size = pgzjs.size(v)
+        if size is None:
+            raise FileNotFoundError("No encuentro la imagen '%s'. Imágenes disponibles: nave, alien, estrella" % v)
+        object.__setattr__(self, "_image", v)
+        self.width, self.height = size[0], size[1]
+    pos = property(lambda s: (s.x, s.y), lambda s, v: s._set_pos(v))
+    center = pos
+    def _set_pos(self, v):
+        self.x, self.y = v[0], v[1]
+    left = property(lambda s: s.x - s.width / 2, lambda s, v: setattr(s, "x", v + s.width / 2))
+    right = property(lambda s: s.x + s.width / 2, lambda s, v: setattr(s, "x", v - s.width / 2))
+    top = property(lambda s: s.y - s.height / 2, lambda s, v: setattr(s, "y", v + s.height / 2))
+    bottom = property(lambda s: s.y + s.height / 2, lambda s, v: setattr(s, "y", v - s.height / 2))
+    topleft = property(lambda s: (s.left, s.top), lambda s, v: (setattr(s, "left", v[0]), setattr(s, "top", v[1])))
+    def draw(self):
+        pgzjs.actor(self._image, self.x, self.y, self.angle)
+    def colliderect(self, o):
+        return self.left < o.right and self.right > o.left and self.top < o.bottom and self.bottom > o.top
+    def collidepoint(self, *p):
+        px, py = p[0] if len(p) == 1 else p
+        return self.left <= px < self.right and self.top <= py < self.bottom
+    def distance_to(self, o):
+        ox, oy = (o.x, o.y) if hasattr(o, "x") else o
+        return ((self.x - ox) ** 2 + (self.y - oy) ** 2) ** 0.5
+
+_pgzrun = types.ModuleType("pgzrun")
+_pgzrun.go = lambda: None
+sys.modules["pgzrun"] = _pgzrun
+`;
+
+/* ---------- ejecución ---------- */
+let py=null, ns=null, running=false, updateFn=null, drawFn=null, runId=0;
+const HINTS = [
+  [/NameError: name '(\w+)' is not defined/, m=>`Python no conoce <b>${m[1]}</b>. ¿Lo escribiste igual que cuando lo creaste? Mayúsculas y minúsculas importan.`],
+  [/expected ':'/, ()=>'Te faltan los <b>dos puntos :</b> al final de la línea (después de def, if, else…).'],
+  [/IndentationError: expected an indented block/, ()=>'Después de una línea con <b>:</b> lo de adentro lleva <b>4 espacios</b> de sangría.'],
+  [/IndentationError: unexpected indent/, ()=>'Esta línea tiene espacios de más al inicio.'],
+  [/IndentationError|TabError|unindent does not match/, ()=>'Revisa los espacios al inicio de las líneas: deben estar alineados.'],
+  [/was never closed|unexpected EOF|'\(' was never closed/, ()=>'Falta cerrar un <b>paréntesis</b> o unas <b>comillas</b>.'],
+  [/unterminated string/, ()=>'Unas <b>comillas</b> se abrieron pero no se cerraron.'],
+  [/invalid syntax/, ()=>'Python no entiende esta línea. Revisa letras, puntos, paréntesis y comillas.'],
+  [/'Actor' object has no attribute '(\w+)'/, m=>`Los actores no tienen <b>${m[1]}</b>. Prueba con x, y, pos, left, right, top, bottom o angle.`],
+  [/'_Keyboard'|keyboard/, ()=>'Teclas disponibles: keyboard.left, right, up, down, space, a, b, c…'],
+  [/No encuentro la imagen/, ()=>'Las imágenes que existen en este laboratorio son <b>"nave"</b>, <b>"alien"</b> y <b>"estrella"</b>.'],
+  [/ZeroDivisionError/, ()=>'No se puede dividir entre cero.'],
+  [/TypeError/, ()=>'Algún valor no es del tipo esperado (por ejemplo, sumar texto con números).'],
+];
+function showError(err, where){
+  running=false; $('#stop').disabled=true;
+  const msg = String(err && err.message || err);
+  const lines = msg.trim().split('\n');
+  let last = lines[lines.length-1];
+  const nums = [...msg.matchAll(/File "juego\.py", line (\d+)/g)].map(m=>+m[1]);
+  const ln = nums.length ? nums[nums.length-1] : null;
+  log('e', `✖ ${ln?`Línea ${ln}: `:''}${last}${where?`  (${where})`:''}`);
+  for(const [re,f] of HINTS){ const m=msg.match(re); if(m){ log('h','💡 '+f(m), true); break; } }
+  if(ln){ const el=$('#errline'); el.style.top=(10+(ln-1)*25)+'px'; el.style.display='block'; }
+}
+function frame(id){
+  if(id!==runId || !running) return;
+  try{
+    if(updateFn) updateFn();
+    if(drawFn) drawFn();
+  }catch(e){ showError(e, updateFn?'mientras el juego corría':''); return; }
+  requestAnimationFrame(()=>frame(id));
+}
+function stop(){ running=false; runId++; $('#stop').disabled=true; }
+function run(){
+  if(!py) return;
+  stop(); clearLog();
+  try{
+    if(ns) ns.destroy();
+    ns = py.globals.get('dict')();
+    py.runPython('from pgzstub import Actor, Rect, screen, keyboard', {globals: ns});
+    // Ejecuta el programa del alumno
+    py.runPython(src.value, {globals: ns, filename: 'juego.py'});
+    const W = +(ns.get('WIDTH') ?? 800), H = +(ns.get('HEIGHT') ?? 600);
+    if(!(W>=50 && W<=1920 && H>=50 && H<=1080)) throw new Error('ValueError: WIDTH y HEIGHT deben estar entre 50 y 1920 × 1080');
+    cv.width=W; cv.height=H; $('#sz').textContent=`${W} × ${H}`;
+    g.fillStyle='#000'; g.fillRect(0,0,W,H);
+    const u=ns.get('update'), d=ns.get('draw');
+    updateFn = (u && typeof u==='function') ? u : null;
+    drawFn = (d && typeof d==='function') ? d : null;
+    if(!drawFn) log('h','💡 No hay función <b>draw()</b>: el juego no dibuja nada.', true);
+    log('o','✔ ¡Tu juego está corriendo! Haz clic en la ventana y usa el teclado.');
+    running=true; $('#stop').disabled=false; runId++; const id=runId;
+    requestAnimationFrame(()=>frame(id));
+    setTimeout(()=>cv.focus({preventScroll:true}), 50);
+  }catch(e){ showError(e); }
+}
+$('#run').onclick=run;
+$('#stop').onclick=()=>{ stop(); log('t','■ Juego detenido.'); };
+
+async function boot(){
+  try{
+    py = await loadPyodide();
+    py.setStdout({batched: s => log('', s)});
+    py.setStderr({batched: s => log('e', s)});
+    py.registerJsModule('pgzjs', bridge);
+    const mod = py.runPython('import types, sys\nm = types.ModuleType("pgzstub")\nsys.modules["pgzstub"] = m\nm');
+    py.runPython(PGZ_STUB, {globals: mod.__dict__});
+    $('#status').style.display='none';
+    $('#run').disabled=false;
+    log('t','>>> Python listo. Este es el código de tu clase: ¡cámbialo como quieras y pulsa ▶ Ejecutar!');
+    run();
+  }catch(e){
+    $('#status').innerHTML='⚠️ No se pudo cargar Python.<br><small>Revisa tu conexión a internet y recarga la página.</small>';
+    log('e', String(e));
+  }
+}
+boot();
+
+/* ---------- escala y animación de entrada ---------- */
+function fit(){ const s=Math.min(innerWidth/1280, innerHeight/720); $('#stage').style.transform=`translate(-50%,-50%) scale(${s})`; }
+addEventListener('resize',fit); fit();
+function playIntro(){ const st=$('#stage'); st.classList.remove('intro','pre'); void st.offsetWidth; st.classList.add('intro'); }
+let shown=false;
+if('IntersectionObserver' in window){
+  new IntersectionObserver(es=>{ const v=es.some(e=>e.isIntersecting); if(v && !shown) playIntro(); shown=v; }, {threshold:0.25}).observe(document.documentElement);
+} else playIntro();
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev, ()=>{ if($('#stage').classList.contains('pre')){ shown=true; playIntro(); } }, true));
+</script>
+</body>
+</html>
