@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador Pygame Zero – Clase 1</title>
+<style>
+  :root{
+    --bg:#1B6FA8; --dark:#14598A; --deep:#0F4A75; --light:#2E87C6;
+    --y:#F7CF46; --y2:#E0B52C; --w:#fff; --code:#0E2A44; --code2:#163C5E;
+    --ok:#5BD68A; --err:#FF6B6B;
+    --mono: Consolas, "Cascadia Code", "Fira Code", Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--deep);overflow:hidden;font-family:var(--sans)}
+  #stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center;
+    background:var(--bg);overflow:hidden;border-radius:6px}
+  /* decor */
+  .wave{position:absolute;pointer-events:none}
+  /* header */
+  header{position:absolute;left:30px;top:20px;width:1220px;height:76px;background:var(--y);border-radius:38px;
+    display:flex;align-items:center;padding:0 14px 0 14px;gap:16px;box-shadow:0 6px 0 var(--y2)}
+  .badge{background:var(--bg);color:var(--y);font-weight:800;border-radius:30px;height:52px;min-width:52px;padding:0 18px;
+    display:flex;align-items:center;justify-content:center;font-size:20px;letter-spacing:.5px;white-space:nowrap}
+  header h1{margin:0;font-size:26px;color:var(--deep);font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dots{display:flex;gap:8px}
+  .dot{width:18px;height:18px;border-radius:50%;border:3px solid var(--deep);background:transparent;transition:.3s}
+  .dot.done{background:var(--deep)}
+  .dot.cur{background:var(--w);transform:scale(1.25)}
+  /* instructions */
+  #instr{position:absolute;left:40px;top:112px;width:640px;color:var(--w);font-size:17px;line-height:1.45;min-height:72px}
+  #instr b{color:var(--y)}
+  #instr code{font-family:var(--mono);background:rgba(0,0,0,.25);padding:1px 6px;border-radius:5px;color:var(--y)}
+  /* editor */
+  #editor{position:absolute;left:40px;top:200px;width:640px;height:400px;background:var(--code);border:3px solid var(--y);
+    border-radius:18px;overflow:hidden;box-shadow:10px 10px 0 rgba(10,34,56,.55);display:flex;flex-direction:column}
+  .chrome{height:40px;background:var(--code2);display:flex;align-items:center;gap:8px;padding:0 14px;flex:none}
+  .chrome i{width:13px;height:13px;border-radius:50%;display:block}
+  .chrome span{margin-left:10px;color:#9FC3E2;font:14px var(--mono);background:var(--bg);padding:3px 14px;border-radius:12px;color:#fff}
+  #code{flex:1;overflow:auto;padding:10px 0 14px;font:18px/27px var(--mono);color:#E6EEF6}
+  .row{display:flex;min-height:27px}
+  .num{width:46px;flex:none;text-align:right;padding-right:14px;color:#4E7394;user-select:none}
+  .src{white-space:pre;flex:1}
+  .row.new .src{animation:flash 1.2s ease}
+  @keyframes flash{0%{background:rgba(91,214,138,.35)}100%{background:transparent}}
+  .slot{display:flex;background:rgba(247,207,70,.08);border-left:4px solid var(--y);margin:2px 0}
+  .slot .nums{width:42px;flex:none;text-align:right;padding-right:14px;color:var(--y);user-select:none;white-space:pre}
+  .slot textarea{flex:1;background:transparent;border:0;outline:0;resize:none;color:#fff;font:18px/27px var(--mono);
+    padding:0;margin:0;white-space:pre;overflow:hidden;caret-color:var(--y);tab-size:4}
+  .slot textarea::placeholder{color:#5F86A8;font-style:italic}
+  .slot.shake{animation:shake .4s}
+  @keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+  .k{color:#FF9DD2}.s{color:#9BE58B}.n{color:#FFB86B}.f{color:#7FD3FF}.b{color:#F7CF46}.c{color:#6C8BA8;font-style:italic}.o{color:#E6EEF6}
+  /* console */
+  #console{position:absolute;left:40px;top:612px;width:640px;height:94px;background:rgba(9,30,50,.75);border-radius:12px;
+    color:#CFE3F5;font:15px/20px var(--mono);padding:10px 14px;overflow:hidden;display:flex;gap:10px;align-items:flex-start}
+  #console .tag{flex:none;font-weight:700}
+  #console.err .tag{color:var(--err)} #console.ok .tag{color:var(--ok)} #console.info .tag{color:var(--y)}
+  #console .msg{flex:1}
+  #console .hint{display:block;color:var(--y);font-family:var(--sans);font-size:15px;margin-top:2px}
+  /* buttons */
+  .btns{position:absolute;left:470px;top:150px;display:flex;gap:10px}
+  button{font-family:var(--sans);cursor:pointer;border:0;border-radius:24px;font-weight:800;font-size:15px;padding:6px 16px;transition:transform .1s}
+  button:active{transform:scale(.96)}
+  #run{background:var(--y);color:var(--deep);box-shadow:0 4px 0 var(--y2)}
+  #run:hover{filter:brightness(1.05)}
+  #help{background:transparent;color:var(--w);border:2px solid rgba(255,255,255,.5);padding:4px 14px}
+  #run{box-shadow:0 3px 0 var(--y2)!important}
+  /* game */
+  #gamewrap{position:absolute;left:720px;top:130px;width:520px;height:440px}
+  #win{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:#0B1B2B;border:3px solid var(--deep);
+    box-shadow:10px 10px 0 rgba(10,34,56,.55);transform:scale(.0);opacity:0;transition:transform .6s cubic-bezier(.2,1.5,.4,1),opacity .4s}
+  #win.open{transform:scale(1);opacity:1}
+  #win .bar{height:34px;background:#E9EEF3;display:flex;align-items:center;padding:0 12px;gap:8px;font:600 14px var(--sans);color:#33475B}
+  #win .bar .sz{margin-left:auto;font:13px var(--mono);color:#6A7F93}
+  #win .bar i{width:12px;height:12px;border-radius:50%;display:block}
+  canvas{display:block;width:100%;height:calc(100% - 34px);outline:none}
+  #closed{position:absolute;inset:0;border:3px dashed rgba(255,255,255,.45);border-radius:14px;display:flex;align-items:center;justify-content:center;
+    color:rgba(255,255,255,.75);font-size:18px;text-align:center;padding:30px;line-height:1.5}
+  #pad{position:absolute;left:720px;top:592px;width:520px;display:flex;gap:12px;align-items:center;opacity:.35;pointer-events:none;transition:.4s}
+  #pad.on{opacity:1;pointer-events:auto}
+  #pad button{background:var(--w);color:var(--deep);font-size:22px;width:64px;height:52px;padding:0;box-shadow:0 4px 0 #B9CFE2}
+  #pad .lbl{color:#fff;font-size:15px;flex:1;line-height:1.35}
+  #pad #reset{width:auto;padding:0 16px;font-size:15px;background:transparent;color:#fff;border:2px solid rgba(255,255,255,.6);box-shadow:none;height:44px}
+  /* finale */
+  #final{position:absolute;inset:0;background:rgba(15,74,117,.0);display:none;align-items:flex-start;justify-content:center;pointer-events:none}
+  .toast{position:absolute;left:720px;top:100px;width:520px;text-align:center;background:var(--ok);color:#0b3a22;font-weight:800;font-size:17px;
+    border-radius:20px;padding:6px 10px;transform:translateY(-12px);opacity:0;transition:.35s;pointer-events:none}
+  .toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- decoración -->
+  <svg class="wave" width="1280" height="720" viewBox="0 0 1280 720" style="left:0;top:0">
+    <path d="M0,720 C340,690 600,560 860,260 L1280,260 L1280,720 Z" fill="#14598A" opacity=".35"/>
+    <path d="M0,610 C110,600 190,670 210,720 L0,720 Z" fill="#fff"/>
+    <path d="M0,570 C150,560 240,660 262,720" fill="none" stroke="#F7CF46" stroke-width="7" stroke-linecap="round"/>
+    <path d="M1250,110 C1215,260 1275,420 1240,720 L1280,720 L1280,110 Z" fill="#14598A"/>
+  </svg>
+
+  <header>
+    <div class="badge" id="badge">Reto 1/6</div>
+    <h1 id="title">Crea la ventana</h1>
+    <div class="dots" id="dots"></div>
+  </header>
+
+  <div id="instr"></div>
+
+  <div id="editor">
+    <div class="chrome"><i style="background:#FF6B6B"></i><i style="background:#F7CF46"></i><i style="background:#5BD68A"></i><span>juego.py</span></div>
+    <div id="code"></div>
+  </div>
+
+  <div id="console" class="info"><span class="tag">&gt;&gt;&gt;</span><span class="msg" id="cmsg">Escribe tu código en la zona amarilla y pulsa <b>▶ Ejecutar</b> (o Ctrl + Enter).</span></div>
+
+  <div id="gamewrap">
+    <div id="closed">La ventana del juego aparecerá aquí<br>cuando tu código la cree 🪟</div>
+    <div id="win">
+      <div class="bar"><i style="background:#FF6B6B"></i><i style="background:#F7CF46"></i><i style="background:#5BD68A"></i>&nbsp;Pygame Zero Game<span class="sz" id="sz"></span></div>
+      <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
+    </div>
+  </div>
+  <div class="toast" id="toast">¡Correcto!</div>
+
+  <div id="pad">
+    <button id="bl" aria-label="Izquierda">◀</button>
+    <button id="br" aria-label="Derecha">▶</button>
+    <span class="lbl" id="padlbl">Usa las flechas ← → del teclado<br>o estos botones</span>
+    <button id="reset">↺ Centrar</button>
+  </div>
+
+  <div id="actions" style="position:absolute;right:604px;top:204px;display:flex;gap:8px;z-index:2"></div>
+</div>
+
+<script>
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function hl(line){
+  // resaltado sencillo de Python
+  const re = /(#.*$)|("[^"]*"?|'[^']*'?)|\b(def|if|elif|else|import|from|return|for|in|while|and|or|not|True|False|None)\b|\b(\d+)\b|\b(Actor|screen|keyboard|pgzrun)\b|\b([a-zA-Z_]\w*)(?=\s*\()/g;
+  let out='', last=0, m;
+  while((m=re.exec(line))){
+    out += esc(line.slice(last,m.index));
+    const t = esc(m[0]);
+    out += m[1]?`<span class="c">${t}</span>`: m[2]?`<span class="s">${t}</span>`: m[3]?`<span class="k">${t}</span>`:
+           m[4]?`<span class="n">${t}</span>`: m[5]?`<span class="b">${t}</span>`: `<span class="f">${t}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(line.slice(last));
+}
+function indentOf(l){ let n=0; for(const ch of l){ if(ch===' ') n++; else if(ch==='\t') n+=4; else break; } return n; }
+function norm(l){ return l.trim().replace(/'/g,'"').replace(/\s+/g,' '); }
+
+/* ---------- estado del juego ---------- */
+const S = { open:false, W:800, H:600, bg:null, bgAnim:0, prevBg:'#000', actor:false, actorName:'nave', visible:false,
+            appear:0, left:false, right:false, x:400, y:450, keys:{}, tap:{}, sparks:[], t:0 };
+
+/* ---------- retos ---------- */
+// Cada línea: indent esperado, regex que debe cumplir (sobre la línea normalizada), ejemplo y comprobaciones de error.
+const defChecks = name => [
+  [l=>/^Def\b|^DEF\b/.test(l), 'SyntaxError: invalid syntax', 'Python distingue mayúsculas: se escribe <b>def</b> en minúscula.'],
+  [l=>!/^def\b/.test(l), 'SyntaxError: invalid syntax', `Las funciones empiezan con la palabra <b>def</b>.`],
+  [l=>!new RegExp('^def '+name+'\\b').test(l), `NameError: la función debe llamarse '${name}'`, `Pygame Zero busca una función llamada exactamente <b>${name}</b>.`],
+  [l=>!/\(\s*\)/.test(l), "SyntaxError: expected '('", 'Después del nombre van los paréntesis <b>()</b>.'],
+  [l=>!/:$/.test(l), "SyntaxError: expected ':'", '¡Te faltan los dos puntos <b>:</b> al final de la línea!'],
+];
+const CHALLENGES = [
+  { title:'Crea la ventana',
+    instr:'Todo juego necesita una ventana. Escribe <b>dos líneas</b>: el ancho <code>WIDTH</code> y el alto <code>HEIGHT</code> de la ventana (por ejemplo 800 y 600).',
+    placeholder:'WIDTH = 800\nHEIGHT = 600',
+    lines:[
+      {indent:0, re:/^WIDTH ?= ?(\d+)$/, ex:'WIDTH = 800', checks:[
+        [l=>/^width/i.test(l)&&!/^WIDTH/.test(l),'NameError','Se escribe en <b>MAYÚSCULAS</b>: WIDTH.'],
+        [l=>!/=/.test(l),'SyntaxError: invalid syntax','Usa el signo <b>=</b> para darle un valor: WIDTH = 800'],
+        [l=>!/\d/.test(l),'SyntaxError','Después del <b>=</b> va un número, por ejemplo 800.']]},
+      {indent:0, re:/^HEIGHT ?= ?(\d+)$/, ex:'HEIGHT = 600', checks:[
+        [l=>/^height/i.test(l)&&!/^HEIGHT/.test(l),'NameError','Se escribe en <b>MAYÚSCULAS</b>: HEIGHT.'],
+        [l=>!/=/.test(l),'SyntaxError: invalid syntax','Usa el signo <b>=</b>: HEIGHT = 600'],
+        [l=>!/\d/.test(l),'SyntaxError','Después del <b>=</b> va un número, por ejemplo 600.']]},
+    ],
+    apply(ms){ S.W=+ms[0][1]; S.H=+ms[1][1]; S.open=true; },
+    validate(ms){ const w=+ms[0][1], h=+ms[1][1];
+      if(w<100||h<100) return ['ValueError','La ventana es muy pequeña: usa números de 100 o más.'];
+      if(w>1920||h>1080) return ['ValueError','¡Esa ventana no cabe en la pantalla! Usa números más pequeños (máx. 1920 × 1080).']; },
+    success:'¡Ventana creada! Por ahora está vacía (negra).'
+  },
+  { title:'Pinta el fondo',
+    instr:'Pygame Zero llama a <code>draw()</code> muchas veces por segundo para dibujar. Crea la función <b>draw</b> y, dentro (con sangría), pinta el fondo con <code>screen.fill("skyblue")</code>. Puedes usar otro color en inglés.',
+    placeholder:'def draw():\n    screen.fill("skyblue")',
+    lines:[
+      {indent:0, re:/^def draw ?\( ?\) ?:$/, ex:'def draw():', checks:defChecks('draw')},
+      {indent:4, re:/^screen\.fill ?\( ?"([a-zA-Z ]+)" ?\)$|^screen\.fill ?\( ?\( ?(\d+) ?, ?(\d+) ?, ?(\d+) ?\) ?\)$/, ex:'    screen.fill("skyblue")', checks:[
+        [l=>/^Screen/.test(l),'NameError: name \'Screen\' is not defined','Se escribe <b>screen</b> en minúscula.'],
+        [l=>!/^screen\./.test(l),'NameError','Empieza con <b>screen.</b> (con punto).'],
+        [l=>!/fill/.test(l),'AttributeError','El método para rellenar es <b>fill</b>.'],
+        [l=>!/\(/.test(l)||!/\)$/.test(l),'SyntaxError: \'(\' was never closed','Revisa los paréntesis: <b>screen.fill("color")</b>'],
+        [l=>/fill ?\( ?[a-zA-Z]/.test(l),'NameError','El color va entre <b>comillas</b>: "skyblue"']]},
+    ],
+    validate(ms){ const m=ms[1]; if(m[1]){ const c=m[1].replace(/ /g,''); const t=document.createElement('canvas').getContext('2d');
+        t.fillStyle='#010203'; t.fillStyle=c; if(t.fillStyle==='#010203') return ['ValueError: unknown color name "'+m[1]+'"','No conozco ese color. Prueba con skyblue, black, navy, purple, darkgreen…']; } },
+    apply(ms){ const m=ms[1]; S.prevBg=S.bg||'#000'; S.bg = m[1]? m[1].replace(/ /g,'') : `rgb(${m[2]},${m[3]},${m[4]})`; S.bgAnim=0.0001; },
+    success:'¡Fondo pintado! draw() lo repinta una y otra vez.'
+  },
+  { title:'Crea un Actor',
+    instr:'Un <b>Actor</b> es un personaje u objeto del juego. Arriba, fuera de draw(), crea la nave usando la imagen <code>"nave"</code>: <code>nave = Actor("nave")</code>.',
+    placeholder:'nave = Actor("nave")',
+    lines:[
+      {indent:0, re:/^([a-z_]\w*) ?= ?Actor ?\( ?"nave" ?\)$/, ex:'nave = Actor("nave")', checks:[
+        [l=>/actor ?\(/.test(l),'NameError: name \'actor\' is not defined','<b>Actor</b> se escribe con <b>A</b> mayúscula.'],
+        [l=>!/Actor/.test(l),'SyntaxError','Usa <b>Actor("nave")</b> para crear el personaje.'],
+        [l=>!/=/.test(l),'SyntaxError','Guarda el actor en una variable: <b>nave = </b>Actor("nave")'],
+        [l=>/Actor ?\( ?nave ?\)/.test(l),'NameError: name \'nave\' is not defined','El nombre de la imagen va entre <b>comillas</b>: Actor(<b>"nave"</b>)'],
+        [l=>/Actor ?\( ?"/.test(l)&&!/"nave"/.test(l),'FileNotFoundError: no image found','La imagen de nuestro proyecto se llama <b>"nave"</b>.'],
+        [l=>/^[A-Z0-9]/.test(l),'SyntaxError','El nombre de la variable empieza en minúscula, por ejemplo <b>nave</b>.']]},
+    ],
+    apply(ms){ S.actor=true; S.actorName=ms[0][1]; S.x=S.W/2; S.y=S.H*0.75; },
+    extraAfter:ms=>[`${ms[0][1]}.pos = ${Math.round(S.W/2)}, ${Math.round(S.H*0.75)}`],
+    success:'Actor creado… pero ¿dónde está? 🤔 Existe en memoria, ¡aún no se dibuja!'
+  },
+  { title:'Dibuja el Actor',
+    get instr(){ return `La nave existe, ¡pero no la vemos! Dentro de <code>draw()</code>, debajo del fondo, dile que se dibuje: <code>${S.actorName}.draw()</code>.`; },
+    get placeholder(){ return `    ${S.actorName}.draw()`; },
+    get lines(){ const n=S.actorName; return [
+      {indent:4, re:new RegExp('^'+n+'\\.draw ?\\( ?\\)$'), ex:`    ${n}.draw()`, checks:[
+        [l=>/\.Draw/.test(l),'AttributeError','<b>draw</b> va en minúscula.'],
+        [l=>!new RegExp('^'+n+'\\b').test(l), `NameError`, `Tu actor se llama <b>${n}</b>. Empieza con ese nombre.`],
+        [l=>!/\./.test(l),'SyntaxError',`Falta el <b>punto</b>: ${n}<b>.</b>draw()`],
+        [l=>!/\(\s*\)$/.test(l),'SyntaxError','Los métodos llevan paréntesis al final: <b>draw()</b>']]}]; },
+    apply(){ S.visible=true; S.appear=0.0001; burst(S.x,S.y); },
+    success:'¡Ahí está tu nave! 🚀'
+  },
+  { title:'Muévete a la izquierda',
+    get instr(){ return `<code>update()</code> se ejecuta 60 veces por segundo. Crea <b>update</b> y, si se presiona la flecha izquierda, resta 5 a la <b>x</b> de la nave. ¡Ojo con la sangría de cada línea!`; },
+    get placeholder(){ return `def update():\n    if keyboard.left:\n        ${S.actorName}.x -= 5`; },
+    get lines(){ const n=S.actorName; return [
+      {indent:0, re:/^def update ?\( ?\) ?:$/, ex:'def update():', checks:defChecks('update')},
+      {indent:4, re:/^if keyboard\.left ?:$/, ex:'    if keyboard.left:', checks:[
+        [l=>/^If/.test(l),'SyntaxError','<b>if</b> va en minúscula.'],
+        [l=>!/^if /.test(l),'SyntaxError','Empieza con <b>if</b> para preguntar si se presiona una tecla.'],
+        [l=>/Keyboard/.test(l),'NameError','<b>keyboard</b> va en minúscula.'],
+        [l=>/keyboard\.(LEFT|Left)/.test(l),'AttributeError','La tecla se escribe en minúscula: <b>keyboard.left</b>'],
+        [l=>!/:$/.test(l),"SyntaxError: expected ':'",'¡Te faltan los dos puntos <b>:</b> al final del if!']]},
+      {indent:8, re:new RegExp('^'+n+'\\.x ?-= ?(\\d+)$|^'+n+'\\.x ?= ?'+n+'\\.x ?- ?(\\d+)$'), ex:`        ${n}.x -= 5`, checks:[
+        [l=>!new RegExp('^'+n+'\\b').test(l),'NameError',`Usa el nombre de tu actor: <b>${n}</b>.x`],
+        [l=>/\+=/.test(l),'¡Funciona, pero al revés!','Para ir a la <b>izquierda</b> la x tiene que <b>disminuir</b>: usa <b>-=</b>'],
+        [l=>/\.y/.test(l),'Movimiento vertical','<b>y</b> mueve arriba/abajo. Para izquierda/derecha usa <b>x</b>.']]},
+    ]; },
+    apply(ms){ S.left=true; S.speedL=+(ms[2][1]||ms[2][2]); focusGame(); },
+    success:'¡Prueba la flecha ← del teclado (haz clic en el juego si no responde)!'
+  },
+  { title:'Y ahora a la derecha',
+    get instr(){ return `Dentro de <code>update()</code>, agrega otro <code>if</code>: si se presiona la flecha derecha, <b>suma</b> 5 a la x de la nave.`; },
+    get placeholder(){ return `    if keyboard.right:\n        ${S.actorName}.x += 5`; },
+    get lines(){ const n=S.actorName; return [
+      {indent:4, re:/^if keyboard\.right ?:$/, ex:'    if keyboard.right:', checks:[
+        [l=>/^If/.test(l),'SyntaxError','<b>if</b> va en minúscula.'],
+        [l=>/keyboard\.left/.test(l),'¡Esa ya la tienes!','Ahora queremos la flecha <b>right</b> (derecha).'],
+        [l=>/Keyboard/.test(l),'NameError','<b>keyboard</b> va en minúscula.'],
+        [l=>!/:$/.test(l),"SyntaxError: expected ':'",'¡Te faltan los dos puntos <b>:</b> al final del if!']]},
+      {indent:8, re:new RegExp('^'+n+'\\.x ?\\+= ?(\\d+)$|^'+n+'\\.x ?= ?'+n+'\\.x ?\\+ ?(\\d+)$'), ex:`        ${n}.x += 5`, checks:[
+        [l=>!new RegExp('^'+n+'\\b').test(l),'NameError',`Usa el nombre de tu actor: <b>${n}</b>.x`],
+        [l=>/-=/.test(l),'¡Funciona, pero al revés!','Para ir a la <b>derecha</b> la x tiene que <b>aumentar</b>: usa <b>+=</b>']]},
+    ]; },
+    apply(ms){ S.right=true; S.speedR=+(ms[1][1]||ms[1][2]); focusGame(); },
+    success:'¡Programa completo! 🎉 Mueve la nave con ← y →'
+  },
+];
+
+/* ---------- programa (orden en el archivo) ---------- */
+// segmentos: líneas fijas o huecos de reto (por índice). Las líneas de retos aún no alcanzados se ocultan.
+const PROGRAM = [
+  {fixed:'import pgzrun'}, {fixed:''},
+  {slot:0}, {fixed:'', after:0},
+  {slot:2}, {fixed:'', after:2},
+  {slot:1}, {slot:3}, {fixed:'', after:1},
+  {slot:4}, {slot:5}, {fixed:'', after:4},
+  {fixed:'pgzrun.go()'},
+];
+let cur = 0, fails = 0;
+const done = {}; // idx -> array de líneas (texto mostrado)
+let justAdded = -1;
+
+function render(){
+  const ch = CHALLENGES[cur];
+  $('#badge').textContent = cur < CHALLENGES.length ? `Reto ${cur+1}/${CHALLENGES.length}` : '¡Completado!';
+  $('#title').textContent = cur < CHALLENGES.length ? ch.title : '¡Tu primer juego en Pygame Zero!';
+  $('#instr').innerHTML = cur < CHALLENGES.length ? ch.instr :
+    'Este es tu programa completo. Haz clic en el juego y mueve la nave con <b>← →</b>. <br>Desafío extra: ¿cómo harías para que no se salga de la pantalla? 👀';
+  $('#dots').innerHTML = CHALLENGES.map((_,i)=>`<div class="dot ${i<cur?'done':''} ${i===cur?'cur':''}"></div>`).join('');
+  const code = $('#code'); code.innerHTML=''; let ln=1;
+  const addRow = (txt, isNew) => { const r=document.createElement('div'); r.className='row'+(isNew?' new':'');
+    r.innerHTML=`<span class="num">${ln++}</span><span class="src">${hl(txt)||' '}</span>`; code.appendChild(r); };
+  for(const seg of PROGRAM){
+    if('fixed' in seg){ if(seg.after===undefined || done[seg.after] || cur===seg.after) addRow(seg.fixed); continue; }
+    const i = seg.slot;
+    if(done[i]) done[i].forEach(t=>addRow(t, justAdded===i));
+    else if(i===cur){
+      const wrap=document.createElement('div'); wrap.className='slot'; wrap.id='slot';
+      const nums=document.createElement('div'); nums.className='nums';
+      const ta=document.createElement('textarea'); ta.id='ta'; ta.spellcheck=false; ta.autocapitalize='off'; ta.autocomplete='off';
+      ta.placeholder = ch.placeholder; ta.value = draft[i] ?? ' '.repeat(ch.lines[0].indent);
+      const start = ln; const sync=()=>{ const n=Math.max(ta.value.split('\n').length, ch.placeholder.split('\n').length);
+        ta.rows=n; nums.textContent=Array.from({length:n},(_,k)=>start+k).join('\n'); draft[i]=ta.value; };
+      ta.addEventListener('input', sync); ta.addEventListener('keydown', onKey);
+      wrap.append(nums, ta); code.appendChild(wrap); sync();
+      ln += ta.rows;
+    }
+  }
+  justAdded=-1;
+  const ta=$('#ta'); if(ta){ setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); $('#slot').scrollIntoView({block:'nearest',behavior:'smooth'}); },30); }
+  $('#actions').innerHTML = cur < CHALLENGES.length
+    ? `<button id="run">▶ Ejecutar</button><button id="help">💡 Pista</button>`
+    : `<button id="run">↺ Empezar de nuevo</button>`;
+  $('#run').onclick = cur < CHALLENGES.length ? run : restart;
+  if($('#help')) $('#help').onclick = hint;
+  $('#pad').classList.toggle('on', S.left||S.right);
+}
+const draft = {};
+
+function onKey(e){
+  const ta=e.target;
+  if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); return; }
+  if(e.key==='Tab'){ e.preventDefault(); insert(ta,'    '); return; }
+  if(e.key==='Enter'){
+    // auto-sangría: mantiene la sangría y agrega 4 espacios después de ":"
+    e.preventDefault();
+    const before = ta.value.slice(0, ta.selectionStart); const line = before.split('\n').pop();
+    let ind = indentOf(line); if(/:\s*$/.test(line)) ind += 4;
+    insert(ta, '\n' + ' '.repeat(ind));
+  }
+  if(e.key==='Backspace'){
+    const p=ta.selectionStart; if(p!==ta.selectionEnd) return;
+    const line = ta.value.slice(0,p).split('\n').pop();
+    if(line.length && /^ +$/.test(line)){ e.preventDefault(); const k = (line.length%4)||4;
+      ta.setRangeText('', p-k, p, 'end'); ta.dispatchEvent(new Event('input')); }
+  }
+}
+function insert(ta, s){ ta.setRangeText(s, ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); }
+
+function say(kind, msg, hint){
+  const c=$('#console'); c.className=kind;
+  c.querySelector('.tag').textContent = kind==='err'?'✖':kind==='ok'?'✔':'>>>';
+  $('#cmsg').innerHTML = msg + (hint?`<span class="hint">💡 ${hint}</span>`:'');
+}
+function fail(lineNo, err, hint){
+  fails++;
+  const s=$('#slot'); s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+  if(fails>=3) hint += ` <br>¿Atascado? Pulsa <b>💡 Pista</b> para ver la respuesta.`;
+  say('err', `${lineNo?`Línea ${lineNo}: `:''}${err}`, hint);
+}
+
+function run(){
+  const ch = CHALLENGES[cur]; const ta=$('#ta'); const specs = ch.lines;
+  const raw = ta.value.split('\n').filter(l=>l.trim()!=='');
+  const firstNo = +$('#slot .nums').textContent.split('\n')[0];
+  if(!raw.length) return fail(0,'No escribiste nada todavía', 'Escribe en la zona amarilla del editor.');
+  const ms=[];
+  for(let k=0;k<specs.length;k++){
+    const sp=specs[k], l=raw[k];
+    if(l===undefined) return fail(firstNo+k, `Falta una línea`, `Te falta escribir: <b>${esc(sp.ex.trim())}</b>`);
+    const n=norm(l), ind=indentOf(l);
+    const m = n.match(sp.re);
+    if(!m){
+      for(const [test,err,h] of sp.checks){ if(test(n)) return fail(firstNo+k, err, h); }
+      return fail(firstNo+k, 'SyntaxError: invalid syntax', fails>=1?`Debería parecerse a: <b>${esc(sp.ex.trim())}</b>`:'Revisa bien esta línea: letras, puntos, paréntesis y comillas.');
+    }
+    if(ind!==sp.indent){
+      const msg = sp.indent===0 ? 'IndentationError: unexpected indent' : 'IndentationError: expected an indented block';
+      const h = sp.indent===0 ? 'Esta línea no lleva espacios al inicio.' :
+        `Esta línea va dentro del bloque anterior: necesita <b>${sp.indent} espacios</b> al inicio (o ${sp.indent/4} Tab).`;
+      return fail(firstNo+k, msg, h);
+    }
+    ms.push(m);
+  }
+  if(raw.length>specs.length) return fail(firstNo+specs.length, 'Sobran líneas', 'En este reto solo necesitas '+specs.length+(specs.length>1?' líneas.':' línea.'));
+  if(ch.validate){ const v=ch.validate(ms); if(v) return fail(0, v[0], v[1]); }
+  // ¡correcto!
+  const shown = raw.map(l=>' '.repeat(indentOf(l))+norm(l));
+  ch.apply(ms);
+  if(ch.extraAfter) shown.push(...ch.extraAfter(ms));
+  done[cur]=shown; justAdded=cur; fails=0;
+  say('ok', ch.success);
+  toast(['¡Correcto!','¡Bien hecho!','¡Excelente!','¡Así se hace!'][cur%4]);
+  cur++; render();
+}
+function hint(){
+  const ch=CHALLENGES[cur]; const ex = ch.lines.map(s=>s.ex).join('\n');
+  say('info', 'La respuesta es:', `<code style="white-space:pre;font-family:var(--mono)">${esc(ex)}</code>`);
+}
+function restart(){ location.reload(); }
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1400); }
+
+/* ---------- juego ---------- */
+const cv=$('#cv'), g=cv.getContext('2d');
+const SHIP = [
+ "....YY....","...YWWY...","...WBBW...","..WWBBWW..","..WWWWWW..",".DWWWWWWD.","DDWWWWWWDD","DD.WWWW.DD","...YOOY...","....OO....","....Y....."];
+const COL={Y:'#F7CF46',W:'#F4F7FA',B:'#5EC4F5',D:'#0F4A75',O:'#FF8A3D'};
+function drawShip(x,y,scale,alpha,ghost){
+  const s=10*scale, w=10*s, h=11*s; g.save(); g.globalAlpha=alpha; g.translate(x-w/2,y-h/2);
+  SHIP.forEach((r,j)=>[...r].forEach((c,i)=>{ if(!COL[c]) return;
+    if(c==='O' && !ghost){ g.fillStyle = Math.sin(S.t*20+i)>0?'#FF8A3D':'#F7CF46'; } else g.fillStyle=ghost?'rgba(255,255,255,.0)':COL[c];
+    if(ghost){ g.strokeStyle='rgba(255,255,255,.8)'; g.setLineDash([4,3]); g.lineWidth=1.5; g.strokeRect(i*s,j*s,s,s); }
+    else g.fillRect(i*s,j*s,s,s); }));
+  g.restore();
+}
+function burst(x,y){ for(let i=0;i<26;i++){ const a=Math.random()*Math.PI*2, v=2+Math.random()*5;
+  S.sparks.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1,c:Math.random()<.6?'#F7CF46':'#fff'}); } }
+const stars = Array.from({length:40},()=>({x:Math.random(),y:Math.random(),s:Math.random()*2+1,v:Math.random()*.3+.1}));
+function frame(){
+  S.t+=1/60;
+  const W=S.W, H=S.H;
+  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  $('#sz').textContent = S.open?`${W} × ${H}`:'';
+  $('#win').classList.toggle('open', S.open); $('#closed').style.display=S.open?'none':'flex';
+  // ventana: ajusta proporción
+  const ww=520, maxh=440-34; let wh = ww*H/W; let w2=ww; if(wh>maxh){ w2=maxh*W/H; wh=maxh; }
+  const win=$('#win'); win.style.width=w2+'px'; win.style.height=(wh+34)+'px'; win.style.left=((520-w2)/2)+'px'; win.style.top=((440-wh-34)/2)+'px';
+  // fondo
+  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  if(S.bg){
+    if(S.bgAnim>0 && S.bgAnim<1){ S.bgAnim=Math.min(1,S.bgAnim+0.03);
+      g.fillStyle=S.prevBg; g.fillRect(0,0,W,H);
+      g.save(); g.beginPath(); g.arc(W/2,H/2,Math.hypot(W,H)/2*easeOut(S.bgAnim),0,7); g.clip(); g.fillStyle=S.bg; g.fillRect(0,0,W,H); g.restore();
+    } else { g.fillStyle=S.bg; g.fillRect(0,0,W,H); }
+    // estrellitas suaves (decoración del fondo)
+    g.fillStyle='rgba(255,255,255,.35)';
+    stars.forEach(st=>{ st.y+=st.v/H*2; if(st.y>1) st.y=0; g.fillRect(st.x*W, st.y*H, st.s, st.s); });
+  }
+  // actor
+  if(S.actor){
+    if(S.left && (S.keys.ArrowLeft||S.keys.btnL||S.tap.ArrowLeft)) S.x -= S.speedL||5;
+    if(S.right && (S.keys.ArrowRight||S.keys.btnR||S.tap.ArrowRight)) S.x += S.speedR||5;
+    const sc = W/800;
+    if(S.visible){
+      let k=1; if(S.appear>0 && S.appear<1){ S.appear=Math.min(1,S.appear+0.035); k=backOut(S.appear); }
+      drawShip(S.x, S.y + Math.sin(S.t*3)*4*sc, sc*k, 1);
+    } else {
+      drawShip(S.x, S.y, sc, .55+.35*Math.sin(S.t*4), true);
+      g.font=`bold ${Math.round(22*sc)}px Segoe UI, sans-serif`; g.fillStyle='rgba(255,255,255,.9)'; g.textAlign='center';
+      g.fillText(`${S.actorName} existe… pero no se ha dibujado`, S.x, S.y - 70*sc);
+    }
+    // coordenada x
+    if(S.left||S.right){ g.font=`${Math.round(26*sc)}px Consolas, monospace`; g.fillStyle='rgba(255,255,255,.85)'; g.textAlign='left';
+      g.fillText(`${S.actorName}.x = ${Math.round(S.x)}`, 14*sc, 28*sc); }
+  }
+  // chispas
+  S.tap={};
+  S.sparks = S.sparks.filter(p=>p.life>0);
+  S.sparks.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vx*=.95; p.vy*=.95; p.life-=.02; g.globalAlpha=Math.max(p.life,0); g.fillStyle=p.c; g.fillRect(p.x-3,p.y-3,6,6); });
+  g.globalAlpha=1;
+  requestAnimationFrame(frame);
+}
+const easeOut=t=>1-Math.pow(1-t,3);
+const backOut=t=>{ const c1=1.9,c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); };
+function focusGame(){ /* deja el foco en el editor si aún hay retos */ if(cur>=CHALLENGES.length-1) setTimeout(()=>cv.focus(),50); }
+addEventListener('keydown',e=>{ if(document.activeElement && document.activeElement.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ S.keys[e.key]=true; S.tap[e.key]=true; e.preventDefault(); } });
+addEventListener('keyup',e=>{ S.keys[e.key]=false; });
+cv.addEventListener('pointerdown',()=>cv.focus());
+const hold=(id,k)=>{ const b=$(id); const on=e=>{e.preventDefault();S.keys[k]=true}, off=()=>S.keys[k]=false;
+  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointerleave',off); };
+hold('#bl','btnL'); hold('#br','btnR');
+$('#reset').onclick=()=>{ S.x=S.W/2; };
+
+/* ---------- escala 1280x720 al tamaño disponible ---------- */
+function fit(){ const s=Math.min(innerWidth/1280, innerHeight/720); $('#stage').style.transform=`translate(-50%,-50%) scale(${s})`; }
+addEventListener('resize',fit); fit();
+render(); frame();
+</script>
+</body>
+</html>
