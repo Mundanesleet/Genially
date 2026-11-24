@@ -14,7 +14,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--deep);overflow:hidden;font-family:var(--sans)}
-  #stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center;
+  #stage{position:fixed;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center;
     background:var(--bg);overflow:hidden;border-radius:6px}
   /* decor */
   .wave{position:absolute;pointer-events:none}
@@ -88,10 +88,41 @@
   .toast{position:absolute;left:720px;top:100px;width:520px;text-align:center;background:var(--ok);color:#0b3a22;font-weight:800;font-size:17px;
     border-radius:20px;padding:6px 10px;transform:translateY(-12px);opacity:0;transition:.35s;pointer-events:none}
   .toast.show{opacity:1;transform:none}
+
+  /* ---------- animación de entrada ---------- */
+  #splash{position:absolute;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;pointer-events:none;opacity:0}
+  #splash .ring{position:absolute;width:520px;height:520px;border-radius:50%;border:14px solid var(--y);opacity:.25}
+  #splash .pill{background:var(--y);color:var(--deep);font-weight:900;font-size:24px;letter-spacing:2px;padding:10px 28px;border-radius:30px;
+    box-shadow:0 5px 0 var(--y2)}
+  #splash .big{color:#fff;font-weight:900;font-size:96px;letter-spacing:3px;line-height:1}
+  #splash .sub{color:#cfe6f7;font-weight:600;font-size:24px}
+  .pre #splash, .intro #splash{opacity:1}
+  .pre #splash > *{opacity:0}
+  .intro #splash{animation:splashOut .5s cubic-bezier(.6,0,.8,.4) 1.35s forwards}
+  .intro #splash .ring{animation:ringIn .9s cubic-bezier(.2,1.2,.4,1) .05s backwards}
+  .intro #splash .pill{animation:popIn .5s cubic-bezier(.2,1.6,.4,1) .15s backwards}
+  .intro #splash .big{animation:popIn .55s cubic-bezier(.2,1.5,.4,1) .3s backwards}
+  .intro #splash .sub{animation:fadeUp .45s ease-out .5s backwards}
+  @keyframes splashOut{to{opacity:0;transform:translateY(-40px) scale(1.04)}}
+  @keyframes ringIn{from{transform:scale(.2);opacity:0}}
+  @keyframes popIn{from{transform:scale(.3);opacity:0}}
+  @keyframes fadeUp{from{transform:translateY(24px);opacity:0}}
+  @keyframes dropIn{from{transform:translateY(-120px);opacity:0}}
+  @keyframes fromLeft{from{transform:translateX(-140px) rotate(-2deg);opacity:0}}
+  @keyframes fromRight{from{transform:translateX(160px) rotate(2deg);opacity:0}}
+  .pre header,.pre #instr,.pre #editor,.pre #actions,.pre #gamewrap,.pre #pad,.pre #console,.pre #resetsmall{visibility:hidden}
+  .intro header{animation:dropIn .6s cubic-bezier(.2,1.4,.4,1) 1.55s backwards}
+  .intro #instr{animation:fadeUp .5s ease-out 1.8s backwards}
+  .intro #editor{animation:fromLeft .65s cubic-bezier(.2,1.2,.4,1) 1.75s backwards}
+  .intro #actions{animation:popIn .45s cubic-bezier(.2,1.6,.4,1) 2.2s backwards}
+  .intro #gamewrap{animation:fromRight .65s cubic-bezier(.2,1.2,.4,1) 1.9s backwards}
+  .intro #console,.intro #pad,.intro #resetsmall{animation:fadeUp .45s ease-out 2.25s backwards}
 </style>
 </head>
 <body>
-<div id="stage">
+<div id="stage" class="pre">
+  <div id="splash"><div class="ring"></div><div class="pill">🎮 ¡A PRACTICAR!</div><div class="big" id="splashBig">PRÁCTICA</div><div class="sub" id="splashSub"></div></div>
   <!-- decoración -->
   <svg class="wave" width="1280" height="720" viewBox="0 0 1280 720" style="left:0;top:0">
     <path d="M0,720 C340,690 600,560 860,260 L1280,260 L1280,720 Z" fill="#14598A" opacity=".35"/>
@@ -314,7 +345,7 @@ function render(){
     }
   }
   justAdded=-1;
-  const ta=$('#ta'); if(ta){ setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); $('#slot').scrollIntoView({block:'nearest'}); window.scrollTo(0,0); document.body.scrollLeft=0; },30); }
+  const ta=$('#ta'); if(ta){ setTimeout(()=>{ ta.focus({preventScroll:true}); ta.setSelectionRange(ta.value.length,ta.value.length); $('#slot').scrollIntoView({block:'nearest'}); window.scrollTo(0,0); document.body.scrollLeft=0; },30); }
   $('#actions').innerHTML = active
     ? `<button id="run">▶ Ejecutar</button><button id="help">💡 Pista</button>`
     : `<button id="help" class="reset">↺ Empezar de cero</button>`;
@@ -521,6 +552,21 @@ $('#reset').onclick=()=>{ S.x=S.W/2; };
 function fit(){ const s=Math.min(innerWidth/1280, innerHeight/720); $('#stage').style.transform=`translate(-50%,-50%) scale(${s})`; }
 addEventListener('resize',fit); fit();
 replayPrevious(); render(); frame();
+
+/* ---------- animación de entrada: se reproduce cada vez que la página aparece ---------- */
+$('#splashBig').textContent = range ? `PRÁCTICA ${Math.floor(START/2)+1}` : '¡A PROGRAMAR!';
+$('#splashSub').textContent = CHALLENGES.slice(START, END).map(c=>c.title).join('  ·  ');
+function playIntro(){
+  const st=$('#stage'); st.classList.remove('intro','pre'); void st.offsetWidth; st.classList.add('intro');
+  const ta=$('#ta'); if(ta) setTimeout(()=>ta.focus({preventScroll:true}), 2400);
+}
+let shown=false;
+if('IntersectionObserver' in window){
+  new IntersectionObserver(es=>{ const v=es.some(e=>e.isIntersecting); if(v && !shown) playIntro(); shown=v; }, {threshold:0.25})
+    .observe(document.documentElement);
+} else playIntro();
+// Si por algún motivo no se detectó que la página está visible, cualquier interacción la muestra.
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev, ()=>{ if($('#stage').classList.contains('pre')){ shown=true; playIntro(); } }, true));
 </script>
 </body>
 </html>
