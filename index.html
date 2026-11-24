@@ -131,6 +131,7 @@
     <button id="reset">↺ Centrar</button>
   </div>
 
+  <button id="resetsmall" onclick="resetAll()" style="position:absolute;left:1080px;top:668px;display:none;background:transparent;color:rgba(255,255,255,.8);border:2px solid rgba(255,255,255,.4);font-size:14px;padding:5px 14px">↺ Empezar de cero</button>
   <div id="actions" style="position:absolute;right:604px;top:204px;display:flex;gap:8px;z-index:2"></div>
 </div>
 
@@ -285,19 +286,22 @@ let justAdded = -1;
 
 function render(){
   const ch = CHALLENGES[cur];
-  $('#badge').textContent = cur < CHALLENGES.length ? `Reto ${cur+1}/${CHALLENGES.length}` : '¡Completado!';
-  $('#title').textContent = cur < CHALLENGES.length ? ch.title : '¡Tu primer juego en Pygame Zero!';
-  $('#instr').innerHTML = cur < CHALLENGES.length ? ch.instr :
-    'Este es tu programa completo. Haz clic en el juego y mueve la nave con <b>← →</b>. <br>Desafío extra: ¿cómo harías para que no se salga de la pantalla? 👀';
-  $('#dots').innerHTML = CHALLENGES.map((_,i)=>`<div class="dot ${i<cur?'done':''} ${i===cur?'cur':''}"></div>`).join('');
+  const active = cur < END;
+  const all = END >= CHALLENGES.length;
+  $('#badge').textContent = active ? `Reto ${cur+1}/${CHALLENGES.length}` : '¡Completado!';
+  $('#title').textContent = active ? ch.title : all ? '¡Tu primer juego en Pygame Zero!' : '¡Práctica completada!';
+  $('#instr').innerHTML = active ? ch.instr : all ?
+    'Este es tu programa completo. Haz clic en el juego y mueve la nave con <b>← →</b>. <br>Desafío extra: ¿cómo harías para que no se salga de la pantalla? 👀' :
+    '¡Muy bien! Tu código quedó guardado. <b>Avanza a la siguiente página</b> para seguir aprendiendo 👉<br>En la próxima práctica continuarás desde aquí.';
+  $('#dots').innerHTML = CHALLENGES.map((_,i)=>`<div class="dot ${i<cur?'done':''} ${i===cur&&active?'cur':''}" style="${i>=START&&i<END?'':'opacity:.35'}"></div>`).join('');
   const code = $('#code'); code.innerHTML=''; let ln=1;
   const addRow = (txt, isNew) => { const r=document.createElement('div'); r.className='row'+(isNew?' new':'');
     r.innerHTML=`<span class="num">${ln++}</span><span class="src">${hl(txt)||' '}</span>`; code.appendChild(r); };
   for(const seg of PROGRAM){
-    if('fixed' in seg){ if(seg.after===undefined || done[seg.after] || cur===seg.after) addRow(seg.fixed); continue; }
+    if('fixed' in seg){ if(seg.after===undefined || done[seg.after] || (cur===seg.after && cur<END)) addRow(seg.fixed); continue; }
     const i = seg.slot;
     if(done[i]) done[i].forEach(t=>addRow(t, justAdded===i));
-    else if(i===cur){
+    else if(i===cur && active){
       const wrap=document.createElement('div'); wrap.className='slot'; wrap.id='slot';
       const nums=document.createElement('div'); nums.className='nums';
       const ta=document.createElement('textarea'); ta.id='ta'; ta.spellcheck=false; ta.autocapitalize='off'; ta.autocomplete='off';
@@ -310,12 +314,13 @@ function render(){
     }
   }
   justAdded=-1;
-  const ta=$('#ta'); if(ta){ setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); $('#slot').scrollIntoView({block:'nearest',behavior:'smooth'}); },30); }
-  $('#actions').innerHTML = cur < CHALLENGES.length
+  const ta=$('#ta'); if(ta){ setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); $('#slot').scrollIntoView({block:'nearest'}); window.scrollTo(0,0); document.body.scrollLeft=0; },30); }
+  $('#actions').innerHTML = active
     ? `<button id="run">▶ Ejecutar</button><button id="help">💡 Pista</button>`
-    : `<button id="run">↺ Empezar de nuevo</button>`;
-  $('#run').onclick = cur < CHALLENGES.length ? run : restart;
-  if($('#help')) $('#help').onclick = hint;
+    : `<button id="help" class="reset">↺ Empezar de cero</button>`;
+  if($('#run')) $('#run').onclick = run;
+  if(active) $('#help').onclick = hint; else $('#help').onclick = resetAll;
+  $('#resetsmall').style.display = active && (cur>0 || Object.keys(saved).length) ? 'block' : 'none';
   $('#pad').classList.toggle('on', S.left||S.right);
 }
 const draft = {};
@@ -352,37 +357,50 @@ function fail(lineNo, err, hint){
   say('err', `${lineNo?`Línea ${lineNo}: `:''}${err}`, hint);
 }
 
-function run(){
-  const ch = CHALLENGES[cur]; const ta=$('#ta'); const specs = ch.lines;
-  const raw = ta.value.split('\n').filter(l=>l.trim()!=='');
-  const firstNo = +$('#slot .nums').textContent.split('\n')[0];
-  if(!raw.length) return fail(0,'No escribiste nada todavía', 'Escribe en la zona amarilla del editor.');
+// Valida el texto de un reto. Devuelve {ms, raw} si está bien o {err:[offset, error, pista]} si no.
+function check(ch, text){
+  const specs = ch.lines;
+  const raw = text.split('\n').filter(l=>l.trim()!=='');
+  if(!raw.length) return {err:[-1,'No escribiste nada todavía','Escribe en la zona amarilla del editor.']};
   const ms=[];
   for(let k=0;k<specs.length;k++){
     const sp=specs[k], l=raw[k];
-    if(l===undefined) return fail(firstNo+k, `Falta una línea`, `Te falta escribir: <b>${esc(sp.ex.trim())}</b>`);
+    if(l===undefined) return {err:[k,'Falta una línea',`Te falta escribir: <b>${esc(sp.ex.trim())}</b>`]};
     const n=norm(l), ind=indentOf(l);
     const m = n.match(sp.re);
     if(!m){
-      for(const [test,err,h] of sp.checks){ if(test(n)) return fail(firstNo+k, err, h); }
-      return fail(firstNo+k, 'SyntaxError: invalid syntax', fails>=1?`Debería parecerse a: <b>${esc(sp.ex.trim())}</b>`:'Revisa bien esta línea: letras, puntos, paréntesis y comillas.');
+      for(const [test,err,h] of sp.checks){ if(test(n)) return {err:[k,err,h]}; }
+      return {err:[k,'SyntaxError: invalid syntax', fails>=1?`Debería parecerse a: <b>${esc(sp.ex.trim())}</b>`:'Revisa bien esta línea: letras, puntos, paréntesis y comillas.']};
     }
     if(ind!==sp.indent){
       const msg = sp.indent===0 ? 'IndentationError: unexpected indent' : 'IndentationError: expected an indented block';
       const h = sp.indent===0 ? 'Esta línea no lleva espacios al inicio.' :
         `Esta línea va dentro del bloque anterior: necesita <b>${sp.indent} espacios</b> al inicio (o ${sp.indent/4} Tab).`;
-      return fail(firstNo+k, msg, h);
+      return {err:[k,msg,h]};
     }
     ms.push(m);
   }
-  if(raw.length>specs.length) return fail(firstNo+specs.length, 'Sobran líneas', 'En este reto solo necesitas '+specs.length+(specs.length>1?' líneas.':' línea.'));
-  if(ch.validate){ const v=ch.validate(ms); if(v) return fail(0, v[0], v[1]); }
-  // ¡correcto!
-  const shown = raw.map(l=>' '.repeat(indentOf(l))+norm(l));
-  ch.apply(ms);
-  if(ch.extraAfter) shown.push(...ch.extraAfter(ms));
-  done[cur]=shown; justAdded=cur; fails=0;
-  say('ok', ch.success);
+  if(raw.length>specs.length) return {err:[specs.length,'Sobran líneas','En este reto solo necesitas '+specs.length+(specs.length>1?' líneas.':' línea.')]};
+  if(ch.validate){ const v=ch.validate(ms); if(v) return {err:[-1,v[0],v[1]]}; }
+  return {ms, raw};
+}
+// Aplica un reto ya validado (efecto en el juego + líneas que se muestran en el editor).
+function commit(i, res, quiet){
+  const ch = CHALLENGES[i];
+  const shown = res.raw.map(l=>' '.repeat(indentOf(l))+norm(l));
+  ch.apply(res.ms);
+  if(ch.extraAfter) shown.push(...ch.extraAfter(res.ms));
+  done[i]=shown;
+  if(!quiet){ saved[i]=res.raw.join('\n'); store(); }
+}
+function run(){
+  const ch = CHALLENGES[cur]; const ta=$('#ta');
+  const firstNo = +$('#slot .nums').textContent.split('\n')[0];
+  const res = check(ch, ta.value);
+  if(res.err){ const [k,e,h]=res.err; return fail(k<0?0:firstNo+k, e, h); }
+  commit(cur, res, false);
+  justAdded=cur; fails=0;
+  say('ok', ch.success + (cur+1===END && END<CHALLENGES.length ? ' <b>¡Práctica completada!</b> Avanza a la siguiente página 👉' : ''));
   toast(['¡Correcto!','¡Bien hecho!','¡Excelente!','¡Así se hace!'][cur%4]);
   cur++; render();
 }
@@ -391,6 +409,40 @@ function hint(){
   say('info', 'La respuesta es:', `<code style="white-space:pre;font-family:var(--mono)">${esc(ex)}</code>`);
 }
 function restart(){ location.reload(); }
+function resetAll(){
+  if(!confirmReset){ confirmReset=true; say('info','¿Borrar tu código y empezar de cero?','Pulsa <b>↺ Empezar de cero</b> otra vez para confirmar.'); return; }
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  location.reload();
+}
+let confirmReset=false;
+
+/* ---------- etapas y memoria ---------- */
+// ?retos=3-4 muestra solo los retos 3 y 4; los anteriores se cargan del código guardado del alumno
+// (o de la solución, si no hay nada guardado).
+const KEY='pgz_clase1_codigo';
+const saved = (()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){ return {}; } })();
+function store(){ try{ localStorage.setItem(KEY, JSON.stringify(saved)); }catch(e){} }
+const range = (new URLSearchParams(location.search).get('retos')||'').match(/^(\d)(?:-(\d))?$/);
+const START = range ? Math.max(1,Math.min(6,+range[1]))-1 : 0;
+const END   = range ? Math.max(START+1,Math.min(6,+(range[2]||range[1]))) : CHALLENGES.length;
+function replayPrevious(){
+  let own=0, auto=0;
+  for(let i=0;i<START;i++){
+    const ch=CHALLENGES[i];
+    let res = saved[i]!=null ? check(ch, saved[i]) : null;
+    if(res && !res.err) own++;
+    else { res = check(ch, ch.lines.map(s=>s.ex).join('\n')); auto++; }
+    commit(i, res, true);
+  }
+  // sin animaciones para lo que ya estaba hecho
+  S.bgAnim=0; S.appear=0; S.sparks=[];
+  cur = START;
+  if(START>0){
+    if(auto===0) say('info', '¡Aquí está <b>tu código</b> de la práctica anterior! Sigue desde donde lo dejaste.');
+    else if(own===0) say('info', 'Cargamos el código de la práctica anterior para que puedas continuar.');
+    else say('info', 'Cargamos tu código de la práctica anterior (y completamos lo que faltaba).');
+  }
+}
 function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1400); }
 
 /* ---------- juego ---------- */
@@ -468,7 +520,7 @@ $('#reset').onclick=()=>{ S.x=S.W/2; };
 /* ---------- escala 1280x720 al tamaño disponible ---------- */
 function fit(){ const s=Math.min(innerWidth/1280, innerHeight/720); $('#stage').style.transform=`translate(-50%,-50%) scale(${s})`; }
 addEventListener('resize',fit); fit();
-render(); frame();
+replayPrevious(); render(); frame();
 </script>
 </body>
 </html>
